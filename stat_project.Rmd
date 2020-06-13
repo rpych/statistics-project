@@ -1,0 +1,144 @@
+---
+title: "Projekt Statystyka Wielowymiarowa"
+author: "Rafal Pych, Witold Soczek"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(randomForest)
+library(gbm)
+library(MASS) #lda, qda
+library(class) #knn
+```
+
+### Wczytanie danych ze zbioru do analizy:
+```{r}
+CARS <- read.csv("car_data.csv", header = TRUE, na.strings = " ")
+CARS <- na.omit(CARS)
+print(head(CARS))
+summary(CARS)
+```
+
+### Wstępna analiza badanych danych: 
+```{r}
+attach(CARS)
+Cars_fuel_petrol <- CARS[CARS$Fuel_Type == "Petrol", ]
+print(dim(Cars_fuel_petrol)[1])
+
+Cars_fuel_diesel <- CARS[CARS$Fuel_Type == "Diesel", ]
+print(dim(Cars_fuel_diesel)[1])
+
+Cars_fuel_cng <- CARS[CARS$Fuel_Type == "CNG", ]
+print(dim(Cars_fuel_cng)[1])
+```
+
+### Klasyfikacja ceny samochodu, którą chciałby otrzymać sprzedający samochód (niska, wysoka) na podstawie rocznika samochodu, jego przebiegu, ceny rynkowej oraz ilości dotychczasowych właścicieli:
+Mediana kolumny Selling_Price wynosi 3.6
+```{r}
+High <- factor(ifelse(CARS$Selling_Price <= 3.6, "Low", "High"))
+CARSH <- data.frame(CARS, High)
+head(CARSH)
+```
+
+### Klasyfikator z użyciem baggingu
+```{r}
+set.seed(1)
+n <- nrow(CARSH)
+train <- sample(1:n, n / 2)
+test <- -train
+price.high.bag <- randomForest(High ~ Year + Present_Price + Kms_Driven + Owner, data = CARSH, subset = train, mtry = 4,
+                         importance = TRUE)
+price.pred.bag <- predict(price.high.bag, newdata = CARSH[test,], type = "class")
+table(price.pred.bag, CARSH$High[test])
+#price.high.bag$confusion
+mean(price.pred.bag != CARSH$High[test])
+importance(price.high.bag)
+varImpPlot(price.high.bag)
+```
+
+### Klasyfikator z użyciem lasu losowego:
+```{r}
+price.high.rf <- randomForest(High ~ Year + Present_Price + Kms_Driven + Owner, data = CARSH, subset = train,
+                         importance = TRUE)
+price.pred.rf <- predict(price.high.rf, newdata = CARSH[test,], type = "class")
+table(price.pred.rf, CARSH$High[test])
+mean(price.pred.rf != CARSH$High[test])
+importance(price.high.rf)
+varImpPlot(price.high.rf)
+```
+
+
+### Klasyfikator z wykorzystaniem boostingu:
+```{r}
+HighB <- ifelse(CARS$Selling_Price <= 3.6, 0, 1)
+CARSHB <- data.frame(CARS, HighB)
+
+price.high.boost <- gbm(HighB ~ Year + Present_Price + Kms_Driven + Owner, data = CARSHB[train,], distribution = "bernoulli",
+                  interaction.depth = 4, n.trees = 1000, shrinkage = 0.01)
+price.pred.boost <- predict(price.high.boost, newdata = CARSHB[test,], type = "response", n.trees = 1000)
+pred.boost.class <- factor(ifelse(price.pred.boost < 0.5, "Low", "High"))
+CARSHB$HighB <- factor(ifelse(CARSHB$Selling_Price <= 3.6, "Low", "High"))
+table(pred.boost.class, CARSHB$HighB[test])
+mean(pred.boost.class != CARSHB$HighB[test])
+
+head(CARSH)
+```
+
+
+### Klasyfikacja z użyciem regresji logistycznej
+```{r}
+contrasts(High)
+fit.logistic <- glm(High ~ Year + Present_Price + Kms_Driven + Owner, 
+                   family = binomial, data = CARSH, subset = train)
+summary(fit.logistic)
+probs.logistic <- predict(fit.logistic, newdata = CARSH[test,], type = "response")
+pred.logistic <- factor(ifelse(probs.logistic < 0.5, "Low", "High"))
+table(pred.logistic, CARSH$High[test])
+mean(pred.logistic != CARSH$High[test])
+head(CARSH)
+```
+
+### Użycie metody LDA do klasyfikacji:
+
+```{r}
+fit.lda <- lda(High ~ Year + Present_Price + Kms_Driven + Owner, 
+                   data = CARSH, subset = train)
+summary(fit.lda)
+pred.lda <- predict(fit.lda, newdata = CARSH[test,], type = "response")
+table(pred.lda$class, CARSH$High[test])
+mean(pred.lda$class != CARSH$High[test])
+```
+
+### Użycie metody QDA do klasyfikacji:
+
+```{r}
+fit.qda <- qda(High ~ Year + Present_Price + Kms_Driven + Owner, 
+                   data = CARSH, subset = train)
+summary(fit.qda)
+pred.qda <- predict(fit.qda, newdata = CARSH[test,], type = "response")
+table(pred.qda$class, CARSH$High[test])
+mean(pred.qda$class != CARSH$High[test])
+```
+
+### Klasyfikator knn, k = 3:
+
+```{r}
+
+train.set <- CARSH[train, c("Year", "Present_Price", "Kms_Driven", "Owner")]
+test.set <- CARSH[test, c("Year", "Present_Price", "Kms_Driven", "Owner")]
+price.train <- CARSH$High[train]
+set.seed(2)
+pred.knn.3 <- knn(train.set, test.set, price.train, k = 3)
+pred.knn.3
+table(pred.knn.3, CARSH$High[test])
+mean(pred.knn.3 != CARSH$High[test])
+```
+
+
+
+
+
