@@ -1,0 +1,121 @@
+---
+title: "Projekt statystyka Wielowymiarowa"
+author: "Rafal Pych, Witold Soczek"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(randomForest)
+library(gbm)
+library(MASS) #lda, qda
+library(class) #knn
+```
+
+# Analiza zbioru zawierającego dane związane z chorobami serca:
+```{r}
+HEART <- read.csv("heart.csv", header = TRUE, na.strings = " ")
+HEART <- na.omit(HEART)
+print(head(HEART))
+summary(HEART)
+HEART$target <- factor(ifelse(HEART$target == 1, 0, 1)) #"NO", "YES", NO - zdrowy, YES - chory
+```
+
+### Klasyfikator z użyciem baggingu
+```{r}
+set.seed(1)
+n <- nrow(HEART)
+train <- sample(1:n, n / 2)
+test <- -train
+heart.dis.bag <- randomForest(target ~ . - target, data = HEART, subset = train, mtry = 13,
+                         importance = TRUE)
+heart.pred.bag <- predict(heart.dis.bag, newdata = HEART[test,], type = "class")
+table(heart.pred.bag, HEART$target[test])
+#price.high.bag$confusion
+mean(heart.pred.bag != HEART$target[test])
+importance(heart.dis.bag)
+varImpPlot(heart.dis.bag)
+```
+
+### Klasyfikator z użyciem lasu losowego:
+```{r}
+heart.dis.rf <- randomForest(target ~ . - target, data = HEART, subset = train,
+                         importance = TRUE)
+heart.pred.rf <- predict(heart.dis.rf, newdata = HEART[test,], type = "class")
+table(heart.pred.rf, HEART$target[test])
+mean(heart.pred.rf != HEART$target[test])
+importance(heart.dis.rf)
+varImpPlot(heart.dis.rf)
+```
+
+
+### Klasyfikator z wykorzystaniem boostingu:
+```{r}
+HEARTB <- data.frame(HEART)
+HEARTB$target <- ifelse(HEART$target == 1, 1, 0)
+
+heart.high.boost <- gbm(target ~ . - target, data = HEARTB[train,], distribution = "bernoulli",
+                  interaction.depth = 4, n.trees = 1000, shrinkage = 0.01)
+heart.pred.boost <- predict(heart.high.boost, newdata = HEARTB[test,], type = "response", n.trees = 1000)
+head(heart.pred.boost)
+hpred.boost.class <- factor(ifelse(heart.pred.boost < 0.5, 0, 1)) # 0 - zdrowy, 1 - chory
+table(hpred.boost.class, HEARTB$target[test])
+mean(hpred.boost.class != HEARTB$target[test])
+
+head(HEARTB)
+```
+
+
+### Klasyfikacja z użyciem regresji logistycznej
+```{r}
+contrasts(HEART$target)
+fit.logistic <- glm(target ~ . - target, 
+                   family = binomial, data = HEART, subset = train)
+summary(fit.logistic)
+probs.logistic <- predict(fit.logistic, newdata = HEART[test,], type = "response")
+pred.logistic <- factor(ifelse(probs.logistic < 0.5, 0, 1))
+table(pred.logistic, HEART$target[test])
+mean(pred.logistic != HEART$target[test])
+head(HEART)
+```
+
+### Użycie metody LDA do klasyfikacji:
+
+```{r}
+fit.lda <- lda(target ~ . - target, 
+                   data = HEART, subset = train)
+summary(fit.lda)
+pred.lda <- predict(fit.lda, newdata = HEART[test,], type = "response")
+table(pred.lda$class, HEART$target[test])
+mean(pred.lda$class != HEART$target[test])
+```
+
+### Użycie metody QDA do klasyfikacji:
+
+```{r}
+fit.qda <- qda(target ~ . - target, 
+                   data = HEART, subset = train)
+summary(fit.qda)
+pred.qda <- predict(fit.qda, newdata = HEART[test,], type = "response")
+table(pred.qda$class, HEART$target[test])
+mean(pred.qda$class != HEART$target[test])
+```
+
+### Klasyfikator knn, k = 9:
+
+```{r}
+
+train.set <- HEART[train, !colnames(HEART) %in% c("target")]
+test.set <- HEART[test, !colnames(HEART) %in% c("target")]
+#head(train.set)
+#head(test.set)
+heart.train <- HEART$target[train]
+set.seed(2)
+pred.knn.9 <- knn(train.set, test.set, heart.train, k = 9)
+pred.knn.9
+table(pred.knn.9, HEART$target[test])
+mean(pred.knn.9 != HEART$target[test])
+```
