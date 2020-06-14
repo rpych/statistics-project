@@ -44,12 +44,15 @@ CARSH <- data.frame(CARS, High)
 head(CARSH)
 ```
 
-### Klasyfikator z użyciem baggingu
 ```{r}
 set.seed(1)
 n <- nrow(CARSH)
 train <- sample(1:n, n / 2)
 test <- -train
+```
+
+### Klasyfikator z użyciem baggingu
+```{r}
 price.high.bag <- randomForest(High ~ Year + Present_Price + Kms_Driven + Owner, data = CARSH, subset = train, mtry = 4,
                          importance = TRUE)
 price.pred.bag <- predict(price.high.bag, newdata = CARSH[test,], type = "class")
@@ -127,7 +130,6 @@ mean(pred.qda$class != CARSH$High[test])
 ### Klasyfikator knn, k = 3:
 
 ```{r}
-
 train.set <- CARSH[train, c("Year", "Present_Price", "Kms_Driven", "Owner")]
 test.set <- CARSH[test, c("Year", "Present_Price", "Kms_Driven", "Owner")]
 price.train <- CARSH$High[train]
@@ -138,7 +140,23 @@ table(pred.knn.3, CARSH$High[test])
 mean(pred.knn.3 != CARSH$High[test])
 ```
 
+## Trzypoziomowa klasyfikacja ceny pojazdu - cena niska, średnia i wysoka:
 
+```{r}
+Price_Level <- factor(ifelse(CARS$Selling_Price <= 5.3, ifelse(CARS$Selling_Price <= 1.5, "Low", "Medium"), "High"))
+CARS3 <- data.frame(CARS, Price_Level)
+head(CARS3)
+summary(CARS3)
+```
 
-
+```{r}
+price.level.bag <- randomForest(Price_Level ~ Year + Present_Price + Kms_Driven + Owner, data = CARS3, subset = train, mtry = 4,
+                         importance = TRUE)
+price.pred.bag <- predict(price.level.bag, newdata = CARS3[test,], type = "class")
+table(price.pred.bag, CARS3$Price_Level[test])
+mean(price.pred.bag != CARS3$Price_Level[test])
+importance(price.level.bag)
+varImpPlot(price.level.bag)
+head(price.pred.bag)
+```
 

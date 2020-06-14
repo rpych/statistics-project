@@ -24,12 +24,15 @@ summary(HEART)
 HEART$target <- factor(ifelse(HEART$target == 1, 0, 1)) #"NO", "YES", NO - zdrowy, YES - chory
 ```
 
-### Klasyfikator z użyciem baggingu
 ```{r}
 set.seed(1)
 n <- nrow(HEART)
 train <- sample(1:n, n / 2)
 test <- -train
+```
+
+### Klasyfikator z użyciem baggingu
+```{r}
 heart.dis.bag <- randomForest(target ~ . - target, data = HEART, subset = train, mtry = 13,
                          importance = TRUE)
 heart.pred.bag <- predict(heart.dis.bag, newdata = HEART[test,], type = "class")
@@ -110,8 +113,6 @@ mean(pred.qda$class != HEART$target[test])
 
 train.set <- HEART[train, !colnames(HEART) %in% c("target")]
 test.set <- HEART[test, !colnames(HEART) %in% c("target")]
-#head(train.set)
-#head(test.set)
 heart.train <- HEART$target[train]
 set.seed(2)
 pred.knn.9 <- knn(train.set, test.set, heart.train, k = 9)
@@ -119,3 +120,93 @@ pred.knn.9
 table(pred.knn.9, HEART$target[test])
 mean(pred.knn.9 != HEART$target[test])
 ```
+
+## Trzypoziomowa klasyfikacja tętna spoczynkowego - tętno niskie, średnie i wysokie:
+
+```{r}
+Press_Level <- factor(ifelse(HEART$trestbps <= 140, ifelse(HEART$trestbps <= 118, "Low", "Medium"), "High"))
+HEART3 <- data.frame(HEART, Press_Level)
+HEART3 <- HEART3[, !colnames(HEART) %in% c("target")]
+head(HEART3)
+summary(HEART3)
+```
+
+### Klasyfikator 3-klasowy z użyciem baggingu:
+```{r}
+heart3.dis.bag <- randomForest(Press_Level ~ . - trestbps, data = HEART3, subset = train, mtry = 12,
+                         importance = TRUE)
+heart3.pred.bag <- predict(heart3.dis.bag, newdata = HEART3[test,], type = "class")
+table(heart3.pred.bag, HEART3$Press_Level[test])
+mean(heart3.pred.bag != HEART3$Press_Level[test])
+importance(heart3.dis.bag)
+varImpPlot(heart3.dis.bag)
+```
+
+### Klasyfikator 3-klasowy z użyciem lasu losowego:
+```{r}
+heart3.dis.bag <- randomForest(Press_Level ~ . - trestbps, data = HEART3, subset = train,
+                         importance = TRUE)
+heart3.pred.bag <- predict(heart3.dis.bag, newdata = HEART3[test,], type = "class")
+head(heart3.pred.bag)
+table(heart3.pred.bag, HEART3$Press_Level[test])
+mean(heart3.pred.bag != HEART3$Press_Level[test])
+importance(heart3.dis.bag)
+varImpPlot(heart3.dis.bag)
+```
+
+
+### Klasyfikator 3-klasowy z wykorzystaniem boostingu:
+```{r}
+Press_levelB <- ifelse(HEART$trestbps <= 140, ifelse(HEART$trestbps <= 118, 1, 2), 3)
+HEART3B <- data.frame(HEART, Press_levelB)
+HEART3B <- HEART3B[, !colnames(HEART3B) %in% c("target")]
+
+heart.high.boost <- gbm(Press_levelB ~ . - trestbps, data = HEART3B[train,], distribution = "multinomial",
+                  interaction.depth = 4, n.trees = 1000, shrinkage = 0.01)
+heart.pred.boost <- predict(heart.high.boost, newdata = HEART3B[test,], type = "response", n.trees = 1000)
+hpred.boost.class <- apply(heart.pred.boost, 1, which.max)
+hpred.boost.class
+table(hpred.boost.class, HEART3B$Press_levelB[test])
+mean(hpred.boost.class != HEART3B$Press_levelB[test])
+
+head(HEART3B)
+```
+
+### Użycie metody LDA do klasyfikacji:
+
+```{r}
+fit.lda <- lda(Press_Level ~ . - trestbps, 
+                   data = HEART3, subset = train)
+summary(fit.lda)
+pred.lda <- predict(fit.lda, newdata = HEART3[test,], type = "response")
+table(pred.lda$class, HEART3$Press_Level[test])
+mean(pred.lda$class != HEART3$Press_Level[test])
+```
+
+### Użycie metody QDA do klasyfikacji:
+
+```{r}
+fit.qda <- qda(Press_Level ~ . - trestbps, 
+                   data = HEART3, subset = train)
+summary(fit.qda)
+pred.qda <- predict(fit.qda, newdata = HEART3[test,], type = "response")
+table(pred.qda$class, HEART3$Press_Level[test])
+mean(pred.qda$class != HEART3$Press_Level[test])
+```
+
+### Klasyfikator knn, k = 3:
+
+```{r}
+
+train.set <- HEART3[train, !colnames(HEART3) %in% c("Press_Level")]
+test.set <- HEART3[test, !colnames(HEART3) %in% c("Press_Level")]
+heart.train <- HEART3$Press_Level[train]
+set.seed(2)
+pred.knn.3 <- knn(train.set, test.set, heart.train, k = 3)
+pred.knn.3
+table(pred.knn.3, HEART3$Press_Level[test])
+mean(pred.knn.3 != HEART3$Press_Level[test])
+```
+
+
+
