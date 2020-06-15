@@ -9,6 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
+library(tree)
 library(randomForest)
 library(gbm)
 library(MASS) #lda, qda
@@ -21,7 +22,7 @@ HEART <- read.csv("heart.csv", header = TRUE, na.strings = " ")
 HEART <- na.omit(HEART)
 print(head(HEART))
 summary(HEART)
-HEART$target <- factor(ifelse(HEART$target == 1, 0, 1)) #"NO", "YES", NO - zdrowy, YES - chory
+HEART$target <- factor(ifelse(HEART$target == 1, 0, 1)) # 0,NO - zdrowy, 1,YES - chory
 ```
 
 ```{r}
@@ -30,6 +31,37 @@ n <- nrow(HEART)
 train <- sample(1:n, n / 2)
 test <- -train
 ```
+
+### Klasyfikator z użyciem drzewa klasyfikacyjnego:
+```{r}
+heart.dis.tree <- tree(target ~ . - target, data = HEART, subset = train)
+tree.class <- predict(heart.dis.tree, newdata = HEART[test,], type = "class")
+table(tree.class, HEART$target[test])
+mean(tree.class != HEART$target[test])
+plot(heart.dis.tree)
+text(heart.dis.tree, pretty = 0)
+#heart.dis.tree
+```
+
+### Klasyfikator z użyciem przyciętego(pruning) drzewa klasyfikacyjnego:
+```{r}
+set.seed(1)
+heart.dis.cv <- cv.tree(heart.dis.tree, FUN = prune.misclass)
+heart.dis.cv
+plot(heart.dis.cv$size, heart.dis.cv$dev, type = "b")
+
+#size.opt <- heart.dis.cv$size[which.min(heart.dis.cv$dev)]
+heart.dis.pruned <- prune.misclass(heart.dis.tree, best = 4)
+plot(heart.dis.pruned)
+text(heart.dis.pruned, pretty = 0)
+
+pruned.class <- predict(heart.dis.pruned, newdata = HEART[test,], 
+                        type = "class")
+table(pruned.class, HEART$target[test])
+mean(pruned.class != HEART$target[test])
+```
+
+#### Przycięte do 4 liści drzewo klasyfikacyjne charakteryzuje się mniejszym błędem testowym (~23%) w porównaniu do błędu testowego domyślnego drzewa klasyfikacyjnego(~27%).
 
 ### Klasyfikator z użyciem baggingu
 ```{r}
@@ -54,6 +86,8 @@ importance(heart.dis.rf)
 varImpPlot(heart.dis.rf)
 ```
 
+#### W przypadku użycia baggingu(wykorzystanie do podziałów węzłów wszystkich predykatorów) i domyślnej konfiguracji lasów losowych(użycie do podzału węzłów części zmiennych z danych) uzyskujemy podobne wartości błędów testowych w klasyfikacji.
+Można zauważyć że dla obu metod ważnymi zmiennymi do podziału węzłów są zmienne: cp, thal, exang, sex, thalach
 
 ### Klasyfikator z wykorzystaniem boostingu:
 ```{r}
@@ -71,6 +105,7 @@ mean(hpred.boost.class != HEARTB$target[test])
 head(HEARTB)
 ```
 
+#### Metoda Boosting w powyższej konfiguracji daje podobne wynik błędu testowego do metod baggingu i lasów losowych (~18%).
 
 ### Klasyfikacja z użyciem regresji logistycznej
 ```{r}
@@ -84,6 +119,8 @@ table(pred.logistic, HEART$target[test])
 mean(pred.logistic != HEART$target[test])
 head(HEART)
 ```
+
+#### Dla regresji logistycznej problem klasyfikacji osoby chorej na serce daje dość niski błąd testowy(~15%). Ponadto analizując model regresji logistycznej można powiedzieć, że zmiennymi statystycznie staotnymi dla modelu są zmienne cp, sex, thalach, ca, thal - model w dużym stopniu zależy od nich.  
 
 ### Użycie metody LDA do klasyfikacji:
 
@@ -107,6 +144,8 @@ table(pred.qda$class, HEART$target[test])
 mean(pred.qda$class != HEART$target[test])
 ```
 
+#### Metoda lda ma błąd testowy nieznacznie większy od regresji logistycznej (także ok. 15%) natomiast qda ma ten błąd na poziomie 20%
+
 ### Klasyfikator knn, k = 9:
 
 ```{r}
@@ -121,7 +160,10 @@ table(pred.knn.9, HEART$target[test])
 mean(pred.knn.9 != HEART$target[test])
 ```
 
-## Trzypoziomowa klasyfikacja tętna spoczynkowego - tętno niskie, średnie i wysokie:
+#### Dla problemu klasyfikacji binarnej metoda knn dla k=9 osiąga najgorszą dokładność (~32%) spośród używanych metod do badanego problemu klasyfikacji. 
+
+## Trzypoziomowa klasyfikacja ciśnienia spoczynkowego krwi - ciśnienie niskie, średnie i wysokie - w zależności od innych cech biometrycznych badanej osoby:
+#### Podział na klasy ciśnienia został przeprowadzony na podstawie najczęściej spotykanych wartości ciśnienia skurczowego krwi. Dla zdrowego człowieka powinno ono należeć do przedziału (118, 140) - zostało oznaczone tu zmienną kategoryczną "Medium". Niższa wartość (<118) należy do klasy niskiego ciśnienia a wartość wyższa niż 140 do klasy ciśnienia wysokiego.
 
 ```{r}
 Press_Level <- factor(ifelse(HEART$trestbps <= 140, ifelse(HEART$trestbps <= 118, "Low", "Medium"), "High"))
@@ -130,6 +172,41 @@ HEART3 <- HEART3[, !colnames(HEART) %in% c("target")]
 head(HEART3)
 summary(HEART3)
 ```
+
+#### Tuple z badanego zbioru mają największy udział w klasie Medium, co odpowiada typowemu zjawisku w rzeczywistości, gdzie średnio największa grupa ludzi ma właściwy poziom ciśnienia krwi.
+
+### Klasyfikator 3-klasowy z użyciem drzewa klasyfikacyjnego:
+```{r}
+set.seed(1)
+heart3.dis.tree <- tree(Press_Level ~ . - trestbps, data = HEART3, subset = train)
+tree.class <- predict(heart3.dis.tree, newdata = HEART3[test,], type = "class")
+table(tree.class, HEART3$Press_Level[test])
+mean(tree.class != HEART3$Press_Level[test])
+plot(heart3.dis.tree)
+text(heart3.dis.tree, pretty = 0)
+#heart.dis.tree
+```
+
+#### Drzewo klasyfikacyjne o 18 liściach zapewnia klasyfikację dla 3 klas z błędem testowym 52%.
+
+### Klasyfikator 3-klasowy z użyciem przyciętego(pruning) drzewa klasyfikacyjnego:
+```{r}
+heart3.dis.cv <- cv.tree(heart3.dis.tree, FUN = prune.misclass)
+heart3.dis.cv
+plot(heart3.dis.cv$size, heart3.dis.cv$dev, type = "b")
+
+size.opt <- heart.dis.cv$size[which.min(heart.dis.cv$dev)]
+heart3.dis.pruned <- prune.misclass(heart3.dis.tree, best = size.opt)
+plot(heart3.dis.pruned)
+text(heart3.dis.pruned, pretty = 0)
+
+pruned.class <- predict(heart3.dis.pruned, newdata = HEART3[test,], 
+                        type = "class")
+table(pruned.class, HEART3$Press_Level[test])
+mean(pruned.class != HEART3$Press_Level[test])
+```
+
+#### Po przycięciu drzewa klasyfikacyjnego do poddrzewa z najmniejszym błędem, zawierającego 14 liści, uzyskujemy nieznaczną poprawę jakości klasyfikacji, z błędem testowym 50%.
 
 ### Klasyfikator 3-klasowy z użyciem baggingu:
 ```{r}
@@ -162,15 +239,16 @@ HEART3B <- data.frame(HEART, Press_levelB)
 HEART3B <- HEART3B[, !colnames(HEART3B) %in% c("target")]
 
 heart.high.boost <- gbm(Press_levelB ~ . - trestbps, data = HEART3B[train,], distribution = "multinomial",
-                  interaction.depth = 4, n.trees = 1000, shrinkage = 0.01)
-heart.pred.boost <- predict(heart.high.boost, newdata = HEART3B[test,], type = "response", n.trees = 1000)
+                  interaction.depth = 4, n.trees = 500, shrinkage = 0.01)
+heart.pred.boost <- predict(heart.high.boost, newdata = HEART3B[test,], type = "response", n.trees = 500)
 hpred.boost.class <- apply(heart.pred.boost, 1, which.max)
 hpred.boost.class
 table(hpred.boost.class, HEART3B$Press_levelB[test])
 mean(hpred.boost.class != HEART3B$Press_levelB[test])
-
 head(HEART3B)
 ```
+
+#### W tym przypadku klasyfikacji bagging uzyskał najlepszą dokładność klasyfikacji z błędem testowym ~40% w porównaniu do metody lasów losowych - błąd testowy to ~42% i  metodą boostingu gdzie ten błąd wynosi ~44%.
 
 ### Użycie metody LDA do klasyfikacji:
 
@@ -194,6 +272,8 @@ table(pred.qda$class, HEART3$Press_Level[test])
 mean(pred.qda$class != HEART3$Press_Level[test])
 ```
 
+#### Metoda lda uzyskała mniejszy błąd testowy (~42%) w porównaniu do metody qda gdzie wartość tego błędu to ~53%.
+
 ### Klasyfikator knn, k = 3:
 
 ```{r}
@@ -208,5 +288,8 @@ table(pred.knn.3, HEART3$Press_Level[test])
 mean(pred.knn.3 != HEART3$Press_Level[test])
 ```
 
+#### W przypadku metody klasyfikacji z użyciem knn dla k=3 uzyskujemy dość dobrą jakość klasyfikacji z błędem testowym ~17%. Jest to najlepsza dokładność klasyfikacji spośród wszystkich badanych metod dla przypadku z 3 klasami ciśnienia krwi.
+
+### O ile metoda knn gorzej radziła sobie z problemem klasyfikacji binarnej, a inne metody (czy to bazujące na drzewach decyzyjnych czy na regresji logistycznej) wypadały wtedy lepiej, to w przypadku gdy występuje potrzeba klasyfikacji dla wiekszej ilości klas zdecydowanie lepiej radzi sobie metoda knn.
 
 
