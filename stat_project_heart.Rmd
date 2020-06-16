@@ -17,9 +17,10 @@ library(class) #knn
 library(leaps)
 library(splines)
 library(gam)
+library(glmnet)
 ```
 
-# Analiza zbioru zawieraj??cego dane zwi??zane z chorobami serca:
+# Analiza zbioru zawierającego dane związane z chorobami serca:
 ```{r}
 HEART <- read.csv("heart.csv", header = TRUE, na.strings = " ")
 HEART <- na.omit(HEART)
@@ -35,7 +36,7 @@ train <- sample(1:n, n / 2)
 test <- -train
 ```
 
-### Klasyfikator z u??yciem drzewa klasyfikacyjnego:
+### Klasyfikator z użyciem drzewa klasyfikacyjnego:
 ```{r}
 heart.dis.tree <- tree(target ~ . - target, data = HEART, subset = train)
 tree.class <- predict(heart.dis.tree, newdata = HEART[test,], type = "class")
@@ -46,7 +47,7 @@ text(heart.dis.tree, pretty = 0)
 #heart.dis.tree
 ```
 
-### Klasyfikator z u??yciem przyci??tego(pruning) drzewa klasyfikacyjnego:
+### Klasyfikator z użyciem przyciętego(pruning) drzewa klasyfikacyjnego:
 ```{r}
 set.seed(1)
 heart.dis.cv <- cv.tree(heart.dis.tree, FUN = prune.misclass)
@@ -64,9 +65,9 @@ table(pruned.class, HEART$target[test])
 mean(pruned.class != HEART$target[test])
 ```
 
-#### Przyci??te do 4 li??ci drzewo klasyfikacyjne charakteryzuje si?? mniejszym b????dem testowym (~23%) w por??wnaniu do b????du testowego domy??lnego drzewa klasyfikacyjnego(~27%).
+Przycięte do 4 liści drzewo klasyfikacyjne charakteryzuje się mniejszym błędem testowym (~23%) w porównaniu do błędu testowego domyślnego drzewa klasyfikacyjnego(~27%).
 
-### Klasyfikator z u??yciem baggingu
+### Klasyfikator z użyciem baggingu
 ```{r}
 heart.dis.bag <- randomForest(target ~ . - target, data = HEART, subset = train, mtry = 13,
                          importance = TRUE)
@@ -78,7 +79,7 @@ importance(heart.dis.bag)
 varImpPlot(heart.dis.bag)
 ```
 
-### Klasyfikator z u??yciem lasu losowego:
+### Klasyfikator z użyciem lasu losowego:
 ```{r}
 heart.dis.rf <- randomForest(target ~ . - target, data = HEART, subset = train,
                          importance = TRUE)
@@ -89,8 +90,8 @@ importance(heart.dis.rf)
 varImpPlot(heart.dis.rf)
 ```
 
-#### W przypadku u??ycia baggingu(wykorzystanie do podzia????w w??z????w wszystkich predykator??w) i domy??lnej konfiguracji las??w losowych(u??ycie do podza??u w??z????w cz????ci zmiennych z danych) uzyskujemy podobne warto??ci b????d??w testowych w klasyfikacji.
-Mo??na zauwa??y?? ??e dla obu metod wa??nymi zmiennymi do podzia??u w??z????w s?? zmienne: cp, thal, exang, sex, thalach
+W przypadku użycia baggingu(wykorzystanie do podziałów węzłów wszystkich predykatorów) i domyślnej konfiguracji lasów losowych(użycie do podzału węzłów części zmiennych z danych) uzyskujemy podobne wartości błędów testowych w klasyfikacji.
+Można zauważyć że dla obu metod ważnymi zmiennymi do podziału węzłów są zmienne: cp, thal, exang, sex, thalach
 
 ### Klasyfikator z wykorzystaniem boostingu:
 ```{r}
@@ -108,9 +109,9 @@ mean(hpred.boost.class != HEARTB$target[test])
 head(HEARTB)
 ```
 
-#### Metoda Boosting w powy??szej konfiguracji daje podobne wynik b????du testowego do metod baggingu i las??w losowych (~18%).
+Metoda Boosting w powyższej konfiguracji daje podobne wynik błędu testowego do metod baggingu i lasów losowych (~18%).
 
-### Klasyfikacja z u??yciem regresji logistycznej
+### Klasyfikacja z użyciem regresji logistycznej
 ```{r}
 contrasts(HEART$target)
 fit.logistic <- glm(target ~ . - target, 
@@ -123,9 +124,9 @@ mean(pred.logistic != HEART$target[test])
 head(HEART)
 ```
 
-#### Dla regresji logistycznej problem klasyfikacji osoby chorej na serce daje do???? niski b????d testowy(~15%). Ponadto analizuj??c model regresji logistycznej mo??na powiedzie??, ??e zmiennymi statystycznie staotnymi dla modelu s?? zmienne cp, sex, thalach, ca, thal - model w du??ym stopniu zale??y od nich.  
+Dla regresji logistycznej problem klasyfikacji osoby chorej na serce daje dość niski błąd testowy(~15%). Ponadto analizując model regresji logistycznej można powiedzieć, że zmiennymi statystycznie staotnymi dla modelu są zmienne cp, sex, thalach, ca, thal - model w dużym stopniu zależy od nich.  
 
-### U??ycie metody LDA do klasyfikacji:
+### Użycie metody LDA do klasyfikacji:
 
 ```{r}
 fit.lda <- lda(target ~ . - target, 
@@ -136,7 +137,7 @@ table(pred.lda$class, HEART$target[test])
 mean(pred.lda$class != HEART$target[test])
 ```
 
-### U??ycie metody QDA do klasyfikacji:
+### Użycie metody QDA do klasyfikacji:
 
 ```{r}
 fit.qda <- qda(target ~ . - target, 
@@ -147,7 +148,7 @@ table(pred.qda$class, HEART$target[test])
 mean(pred.qda$class != HEART$target[test])
 ```
 
-#### Metoda lda ma b????d testowy nieznacznie wi??kszy od regresji logistycznej (tak??e ok. 15%) natomiast qda ma ten b????d na poziomie 20%
+Metoda lda ma błąd testowy nieznacznie większy od regresji logistycznej (także ok. 15%) natomiast qda ma ten błąd na poziomie 20%
 
 ### Klasyfikator knn, k = 9:
 
@@ -163,10 +164,11 @@ table(pred.knn.9, HEART$target[test])
 mean(pred.knn.9 != HEART$target[test])
 ```
 
-#### Dla problemu klasyfikacji binarnej metoda knn dla k=9 osi??ga najgorsz?? dok??adno???? (~32%) spo??r??d u??ywanych metod do badanego problemu klasyfikacji. 
+Dla problemu klasyfikacji binarnej metoda knn dla k=9 osiąga najgorszą dokładność (~32%) spośród używanych metod do badanego problemu klasyfikacji. 
 
-## Trzypoziomowa klasyfikacja ci??nienia spoczynkowego krwi - ci??nienie niskie, ??rednie i wysokie - w zale??no??ci od innych cech biometrycznych badanej osoby:
-#### Podzia?? na klasy ci??nienia zosta?? przeprowadzony na podstawie najcz????ciej spotykanych warto??ci ci??nienia skurczowego krwi. Dla zdrowego cz??owieka powinno ono nale??e?? do przedzia??u (118, 140) - zosta??o oznaczone tu zmienn?? kategoryczn?? "Medium". Ni??sza warto???? (<118) nale??y do klasy niskiego ci??nienia a warto???? wy??sza ni?? 140 do klasy ci??nienia wysokiego.
+### Trzypoziomowa klasyfikacja ciśnienia spoczynkowego krwi - ciśnienie niskie, średnie i wysokie - w zależności od innych cech biometrycznych badanej osoby:
+Podział na klasy ciśnienia został przeprowadzony na podstawie najczęściej spotykanych wartości ciśnienia skurczowego krwi. Dla zdrowego człowieka powinno ono należeć do przedziału (118, 140) - zostało oznaczone tu zmienną kategoryczną "Medium". Niższa wartość (<118) należy do klasy niskiego ciśnienia a wartość wyższa niż 140 do klasy ciśnienia wysokiego.
+
 
 ```{r}
 Press_Level <- factor(ifelse(HEART$trestbps <= 140, ifelse(HEART$trestbps <= 118, "Low", "Medium"), "High"))
@@ -176,9 +178,9 @@ head(HEART3)
 summary(HEART3)
 ```
 
-#### Tuple z badanego zbioru maj?? najwi??kszy udzia?? w klasie Medium, co odpowiada typowemu zjawisku w rzeczywisto??ci, gdzie ??rednio najwi??ksza grupa ludzi ma w??a??ciwy poziom ci??nienia krwi.
+Tuple z badanego zbioru mają największy udział w klasie `Medium`, co odpowiada typowemu zjawisku w rzeczywistości, gdzie średnio największa grupa ludzi ma właściwy poziom ciśnienia krwi.
 
-### Klasyfikator 3-klasowy z u??yciem drzewa klasyfikacyjnego:
+### Klasyfikator 3-klasowy z użyciem drzewa klasyfikacyjnego:
 ```{r}
 set.seed(1)
 heart3.dis.tree <- tree(Press_Level ~ . - trestbps, data = HEART3, subset = train)
@@ -190,9 +192,9 @@ text(heart3.dis.tree, pretty = 0)
 #heart.dis.tree
 ```
 
-#### Drzewo klasyfikacyjne o 18 li??ciach zapewnia klasyfikacj?? dla 3 klas z b????dem testowym 52%.
+Drzewo klasyfikacyjne o 18 liściach zapewnia klasyfikację dla 3 klas z błędem testowym 52%.
 
-### Klasyfikator 3-klasowy z u??yciem przyci??tego(pruning) drzewa klasyfikacyjnego:
+### Klasyfikator 3-klasowy z użyciem przyciętego(pruning) drzewa klasyfikacyjnego:
 ```{r}
 heart3.dis.cv <- cv.tree(heart3.dis.tree, FUN = prune.misclass)
 heart3.dis.cv
@@ -209,9 +211,9 @@ table(pruned.class, HEART3$Press_Level[test])
 mean(pruned.class != HEART3$Press_Level[test])
 ```
 
-#### Po przyci??ciu drzewa klasyfikacyjnego do poddrzewa z najmniejszym b????dem, zawieraj??cego 14 li??ci, uzyskujemy nieznaczn?? popraw?? jako??ci klasyfikacji, z b????dem testowym 50%.
+Po przycięciu drzewa klasyfikacyjnego do poddrzewa z najmniejszym błędem, zawierającego 14 liści, uzyskujemy nieznaczną poprawę jakości klasyfikacji, z błędem testowym 50%.
 
-### Klasyfikator 3-klasowy z u??yciem baggingu:
+### Klasyfikator 3-klasowy z użyciem baggingu:
 ```{r}
 heart3.dis.bag <- randomForest(Press_Level ~ . - trestbps, data = HEART3, subset = train, mtry = 12,
                          importance = TRUE)
@@ -222,7 +224,7 @@ importance(heart3.dis.bag)
 varImpPlot(heart3.dis.bag)
 ```
 
-### Klasyfikator 3-klasowy z u??yciem lasu losowego:
+### Klasyfikator 3-klasowy z użyciem lasu losowego:
 ```{r}
 heart3.dis.bag <- randomForest(Press_Level ~ . - trestbps, data = HEART3, subset = train,
                          importance = TRUE)
@@ -251,9 +253,9 @@ mean(hpred.boost.class != HEART3B$Press_levelB[test])
 head(HEART3B)
 ```
 
-#### W tym przypadku klasyfikacji bagging uzyska?? najlepsz?? dok??adno???? klasyfikacji z b????dem testowym ~40% w por??wnaniu do metody las??w losowych - b????d testowy to ~42% i  metod?? boostingu gdzie ten b????d wynosi ~44%.
+W tym przypadku klasyfikacji bagging uzyskał najlepszą dokładność klasyfikacji z błędem testowym ~40% w porównaniu do metody lasów losowych - błąd testowy to ~42% i  metodą boostingu gdzie ten błąd wynosi ~44%.
 
-### U??ycie metody LDA do klasyfikacji:
+### Użycie metody LDA do klasyfikacji:
 
 ```{r}
 fit.lda <- lda(Press_Level ~ . - trestbps, 
@@ -264,7 +266,7 @@ table(pred.lda$class, HEART3$Press_Level[test])
 mean(pred.lda$class != HEART3$Press_Level[test])
 ```
 
-### U??ycie metody QDA do klasyfikacji:
+### Użycie metody QDA do klasyfikacji:
 
 ```{r}
 fit.qda <- qda(Press_Level ~ . - trestbps, 
@@ -275,7 +277,7 @@ table(pred.qda$class, HEART3$Press_Level[test])
 mean(pred.qda$class != HEART3$Press_Level[test])
 ```
 
-#### Metoda lda uzyska??a mniejszy b????d testowy (~42%) w por??wnaniu do metody qda gdzie warto???? tego b????du to ~53%.
+Metoda lda uzyskała mniejszy błąd testowy (~42%) w porównaniu do metody qda gdzie wartość tego błędu to ~53%.
 
 ### Klasyfikator knn, k = 3:
 
@@ -291,9 +293,9 @@ table(pred.knn.3, HEART3$Press_Level[test])
 mean(pred.knn.3 != HEART3$Press_Level[test])
 ```
 
-#### W przypadku metody klasyfikacji z u??yciem knn dla k=3 uzyskujemy do???? dobr?? jako???? klasyfikacji z b????dem testowym ~17%. Jest to najlepsza dok??adno???? klasyfikacji spo??r??d wszystkich badanych metod dla przypadku z 3 klasami ci??nienia krwi.
+W przypadku metody klasyfikacji z użyciem knn dla k=3 uzyskujemy dość dobrą jakość klasyfikacji z błędem testowym ~17%. Jest to najlepsza dokładność klasyfikacji spośród wszystkich badanych metod dla przypadku z 3 klasami ciśnienia krwi.
 
-### O ile metoda knn gorzej radzi??a sobie z problemem klasyfikacji binarnej, a inne metody (czy to bazuj??ce na drzewach decyzyjnych czy na regresji logistycznej) wypada??y wtedy lepiej, to w przypadku gdy wyst??puje potrzeba klasyfikacji dla wiekszej ilo??ci klas zdecydowanie lepiej radzi sobie metoda knn.
+O ile metoda knn gorzej radziła sobie z problemem klasyfikacji binarnej, a inne metody (czy to bazujące na drzewach decyzyjnych czy na regresji logistycznej) wypadały wtedy lepiej, to w przypadku gdy występuje potrzeba klasyfikacji dla wiekszej ilości klas zdecydowanie lepiej radzi sobie metoda knn.
 
 ## Regresja zmiennej `chol` reprezentującej wartości cholesterolu wśród pacjentów
 
@@ -550,4 +552,43 @@ age.grid <- seq(age.lims[1], age.lims[2])
 pred.gam <- predict(fit.gam.bf, list(X...age = age.grid), se.fit = TRUE)
 plot(X...age, chol, cex = 0.5, col = "darkgrey")
 lines(age.grid,pred.gam, col = "red", se = TRUE)
+```
+
+### Regresja grzbietowa
+```{r}
+X <- model.matrix(HEART$chol ~ ., data = HEART)[, -1]
+y <- HEART$X...age
+
+lambda.grid <- 10^seq(10, -2, length.out = 100)
+fit.ridge <- glmnet(X, y, alpha = 0, lambda = lambda.grid)
+set.seed(1)
+n <- nrow(X)
+train <- sample(1:n, n / 2)
+test <- -train
+```
+
+dla przykładowego lambda = 5
+```{r}
+pred.ridge <- predict(fit.ridge, x = X[train,], y = y[train], s = 5, newx = X[test,])
+mean((pred.ridge - y[test])^2)
+```
+
+dla optymalnego lambda
+```{r}
+cv.out <- cv.glmnet(X[train,], y[train], alpha = 0)
+plot(cv.out)
+cv.out$lambda.min # optymalne lambda
+fit.ridge <- glmnet(X[train,], y[train], alpha = 0, lambda = lambda.grid, thresh = 1e-12)
+pred.ridge <- predict(fit.ridge, s = cv.out$lambda.min, newx = X[test,])
+mean((pred.ridge - y[test])^2)
+```
+
+### Regresja z wykorzystaniem metody Lasso
+```{r}
+fit.lasso <- glmnet(X[train,], y[train], alpha = 1)
+cv.out <- cv.glmnet(X[train,], y[train], alpha = 1)
+plot(cv.out)
+cv.out$lambda.min
+pred.lasso <- predict(fit.lasso, s = cv.out$lambda.min, newx = X[test,])
+mean((pred.lasso - y[test])^2)
 ```
