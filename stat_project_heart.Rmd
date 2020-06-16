@@ -295,19 +295,11 @@ mean(pred.knn.3 != HEART3$Press_Level[test])
 
 ### O ile metoda knn gorzej radzi??a sobie z problemem klasyfikacji binarnej, a inne metody (czy to bazuj??ce na drzewach decyzyjnych czy na regresji logistycznej) wypada??y wtedy lepiej, to w przypadku gdy wyst??puje potrzeba klasyfikacji dla wiekszej ilo??ci klas zdecydowanie lepiej radzi sobie metoda knn.
 
-## Regresja
-### Regresja wielokrotna zmiennej `chol` reprezentującej wartości cholesterolu wśród pacjentów: 
-
-```{r}
-lmFit <- lm(chol ~ ., data = HEART)
-summary(lmFit)
-layout(matrix(c(1,2,3,4),2,2))
-plot(lmFit)
-```
+## Regresja zmiennej `chol` reprezentującej wartości cholesterolu wśród pacjentów
 
 ### Zestawienie prostych regresji liniowych 
 ```{r}
-cols <- names(HEART)[-1]
+cols <- names(HEART)
 cols <- cols[!cols %in% c("chol")]
 lm.heart <- vector("list", length(cols))
 
@@ -318,15 +310,89 @@ summaries <- lapply(lm.heart, summary)
 cols
 summaries
 ```
+Przyglądając się powyższemu zestawieniu zauważyć można że najlepsze dopasowanie modelu uzyskaliśmy dla predyktora związanego z wiekiem (`X...age`)
+oraz płcią (`sex`) badanego. 
 
+Wniosek ten wyciągnięty jest na podstawie następujących wartości: 
+
+  podawane w nawisach wartości kolejno dla predyktorów (`X...age` / `sex`)
+  
+  -> R-squered = (0.045 / 0.039) - największe wartości spośród wszystkich predyktorów, choć mimo to, są to wartości niepokojąco niskie, i dla poprawnego predyktora
+    oczekiwalibyśmy wyższych wartości
+    
+  -> Adj R-Squared = (0.042 / 0.036) - najwyższe wartości spośród wszystkich predykatów
+  
+  -> F-statistic = (14.4 / 12.27) - najwyższe wartości spośród wszystkich predykatów
+  
+  -> t-statistic = (0.000179 / 0.00053)
+  
+  -> Std. Error = (17.71 / 5.19) - w tym przypadku wartość błędu osłabia znaczenie predyktora `X...age` ponieważ jest ona stosunkowo wysoka.
+
+### Regresja wielokrotna 
+
+```{r}
+lmFit <- lm(chol ~ ., data = HEART)
+summary(lmFit)
+layout(matrix(c(1,2,3,4),2,2))
+plot(lmFit)
+```
+
+to samo wybierając tylko najbardziej znaczące zmienne uzyskane w poprzednim kroku:
+```{r}
+lmFit <- lm(chol ~ X...age + sex + restecg, data = HEART)
+summary(lmFit)
+layout(matrix(c(1,2,3,4),2,2))
+plot(lmFit)
+```
+
+Ograniczając ilość zmiennycj w regresji wielokrotnej uzyskaliśmy poprawę dla metryki `F-Statistic`która w nowym modelu miała wyższą wartość. 
+Natomiast wartości błędu kwadratowego zmalały co jest gorszym wynikiem dla nowego modelu.  
+
+Analiza regresji wielokrotnej:
+
+  -> `Residuals vs Fitted` - uzyskaliśmy poziomą wskazującą związek liniowy predyktora względem wyjścia
+  
+  -> `Normal Q-Q` - otrzymaliśmy wykres podążający za przerywaną linią co oznacza równomierny rozkład błędu (*normally distributed residual*)
+  
+  -> `Scale-Location` - wksaźnik jednorodności wariancji błędu, uzyskana pozioma linia z równomiernie rozłożonymi wynikami jest dobrą oznaką
+  
+  -> `Residuals vs Leverage` - określa wartości których wykluczenie lub wzięcie pod uwagę ma znaczący wpływ na linię regresji (w tym przypadku 
+  wszystkie wartości znajdując się wewnątrz obszaru zakreślającego dystans Cook'a co jest dobrym wskaźnikiem - brak wartości zaburzących model)
+ 
 ### Selekcja cech dla modeli nieliniowych za pomocą funkcji `regsubsets()`
 ```{r}
 fit.bs <- regsubsets(chol ~ ., data = HEART, nvmax=12)
 fit.bs.summary <- summary(fit.bs)
-bic.min <- which.min(fit.bs.summary$bic)
-plot(fit.bs.summary$bic, xlab = "Liczba zmiennych", ylab = "BIC", col = "green",
-     type = "b", pch = 20)
-points(bic.min, fit.bs.summary$bic[bic.min], col = "red", pch = 9)
+
+bic.min <- which.min(fit.bs.summary$bic) # Schwartz's information criterion
+plot(fit.bs.summary$bic, xlab = "Liczba zmiennych", ylab = "Schwartz's information criterion", col = "green", type = "b", pch = 20)
+points(bic.min, fit.bs.summary$bic[bic.min], col = "red", pch = 8)
+
+cp.min <- which.min(fit.bs.summary$cp) # Mallows' Cp
+plot(fit.bs.summary$cp, xlab = "Liczba zmiennych", ylab = "Mallows' Cp", col = "green", type = "b", pch = 20)
+points(cp.min, fit.bs.summary$cp[cp.min], col = "red", pch = 8)
+
+adjr2.max <- which.max(fit.bs.summary$adjr2) # Adjusted r-squared
+plot(fit.bs.summary$adjr2, xlab = "Liczba zmiennych", ylab = "Adjusted r-squared", col = "green", type = "b", pch = 20)
+points(adjr2.max, fit.bs.summary$adjr2[adjr2.max], col = "red", pch = 8)
+```
+
+Jak widzimy każde z kryteriów podało inną ilość cech jako optymalną dla naszego modelu, poniżej estymaty współczynników 
+dla kolejno wyznaczonych optymalnych podzbiorów
+
+BIC:
+```{r}
+coef(fit.bs, id = bic.min)
+```
+
+CP:
+```{r}
+coef(fit.bs, id = cp.min)
+```
+
+ADFR2:
+```{r}
+coef(fit.bs, id = adjr2.max)
 ```
 
 ### Selekcja krokowa do przodu i wstecz
@@ -350,7 +416,12 @@ pred.error <- function(i, model, subset) {
 val.errors <- sapply(1:12, pred.error, model = fit.bs.v, subset = test)
 val.errors
 ```
-Według powyższego kryterium optymalny model można uzyskać wykorzystując wszystkie zmienne
+
+Według powyższego kryterium optymalny model można uzyskać wykorzystując wszystkie zmienne.
+
+```{r}
+fit.bs.v <- regsubsets(chol ~ ., data = HEART[test,], nvmax = 12)
+```
 
 ### Wybór modelu przy pomocy k-krotnej walidacji krzyżowej
 ```{r}
@@ -366,8 +437,12 @@ for (j in 1:k) {
 cv.errors <- apply(validation.errors, 2, mean)
 cv.errors
 ```
-Według tej metody optymalny model uzyskamy przy 4 zmiennych
 
+Według tej metody optymalny model uzyskamy przy 4 zmiennych.
+
+## Modele nieliniowe
+
+Poniżej przedstawione są wizualizacje dopasowania modeli nieliniowych (po 2 różne warianty każdy)
 ### Regresja wielomianowa
 ```{r}
 attach(HEART)
@@ -385,6 +460,9 @@ lines(age.grid, pred.poly4$fit, col = "blue", lwd = 2)
 matlines(age.grid, se.bands2, col = "red", lty = "dashed")
 matlines(age.grid, se.bands4, col = "blue", lty = "dashed")
 ```
+
+Zwiększenie stopnia wielomianu nie poprawiło znacząco dopasowania modelu, jedyne zauważalne różnice widzimy
+dla wartości skrajnych
 
 ### Funkcji schodkowe
 ```{r}
@@ -404,6 +482,8 @@ lines(age.grid, pred.step8$fit, col = "blue", lwd = 2)
 matlines(age.grid, se.bands8, col = "blue", lty = "dashed")
 ```
 
+Zwiększenie ilości punktów załamań (*breaks*) poprawiło dopasowanie modelu
+
 ### Funkcje sklejane
 ```{r}
 fit.bs.knots4 <- lm(chol ~ bs(X...age, df = 4, degree = 4), data = HEART)
@@ -421,6 +501,9 @@ lines(age.grid, pred.bs.knots8$fit, col = "blue", lwd = 2)
 lines(age.grid, pred.bs.knots8$fit + 2 * pred.bs.knots8$se.fit, col = "blue", lty = "dashed")
 lines(age.grid, pred.bs.knots8$fit - 2 * pred.bs.knots8$se.fit, col = "blue", lty = "dashed")
 ```
+
+Funkcja sklejana wyższego stopnia wydaje się być lepiej dopasowana do większości danych, 
+niepokojące mogą być natomiast krańcowe wartości, istnieje tutaj obawa o "nadmierne dopasowania"
 
 ### Naturalne funkcje sklejane
 ```{r}
@@ -440,6 +523,8 @@ lines(age.grid, pred.ns8$fit + 2 * pred.ns8$se.fit, col = "blue", lty = "dashed"
 lines(age.grid, pred.ns8$fit - 2 * pred.ns8$se.fit, col = "blue", lty = "dashed")
 ```
 
+Naturalna funkcja sklejana 8 stopnia daje "bezpieczniejsze" dopasowanie dla krańcowych wartości w stosunku do funkcji
+uzyskanej w punkcie poprzednim
 
 ### Regresja lokalna
 ```{r message=FALSE, warning=FALSE}
@@ -461,5 +546,8 @@ legend("topright", legend = paste("smoothness =", s), col = c("red", "blue", "gr
 ### Regresja z wykorzystaniem uogólnionych modeli addatywnych
 ```{r message=FALSE, warning=FALSE}
 fit.gam.bf <- gam(chol ~ s(X...age, df = 4), data = HEART)
-plot.Gam(fit.gam.bf, col = "red", se = TRUE)
+age.grid <- seq(age.lims[1], age.lims[2])
+pred.gam <- predict(fit.gam.bf, list(X...age = age.grid), se.fit = TRUE)
+plot(X...age, chol, cex = 0.5, col = "darkgrey")
+lines(age.grid,pred.gam, col = "red", se = TRUE)
 ```
