@@ -211,7 +211,7 @@ table(pruned.class, HEART3$Press_Level[test])
 mean(pruned.class != HEART3$Press_Level[test])
 ```
 
-Po przycięciu drzewa klasyfikacyjnego do poddrzewa z najmniejszym błędem, zawierającego 14 liści, uzyskujemy nieznaczną poprawę jakości klasyfikacji, z błędem testowym 50%.
+Po przycięciu drzewa klasyfikacyjnego do poddrzewa z najmniejszym błędem, zawierającego 11 liści, uzyskujemy nieznaczną poprawę jakości klasyfikacji, z błędem testowym 46%.
 
 ### Klasyfikator 3-klasowy z użyciem baggingu:
 ```{r}
