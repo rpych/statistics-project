@@ -200,7 +200,7 @@ heart3.dis.cv <- cv.tree(heart3.dis.tree, FUN = prune.misclass)
 heart3.dis.cv
 plot(heart3.dis.cv$size, heart3.dis.cv$dev, type = "b")
 
-size.opt <- heart.dis.cv$size[which.min(heart.dis.cv$dev)]
+size.opt <- heart3.dis.cv$size[which.min(heart3.dis.cv$dev)]
 heart3.dis.pruned <- prune.misclass(heart3.dis.tree, best = size.opt)
 plot(heart3.dis.pruned)
 text(heart3.dis.pruned, pretty = 0)
@@ -301,6 +301,9 @@ O ile metoda knn gorzej radziła sobie z problemem klasyfikacji binarnej, a inne
 
 ### Zestawienie prostych regresji liniowych 
 ```{r}
+colnames(HEART)[1] <- "X...age"
+attach(HEART)
+#head(HEART)
 cols <- names(HEART)
 cols <- cols[!cols %in% c("chol")]
 lm.heart <- vector("list", length(cols))
